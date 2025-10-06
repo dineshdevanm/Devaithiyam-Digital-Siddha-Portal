@@ -6,8 +6,8 @@ fastapi==0.104.1              # API framework (Pydantic v2 compatible)
 uvicorn[standard]==0.24.0     # ASGI server
 python-dotenv==1.0.0          # Load .env for SIMPLE_MODE / API keys
 pandas==2.1.4                 # CSV loading & preprocessing
-numpy==1.24.3                 # Pandas dependency & NaN handling
-pydantic==2.5.3               # Data models (explicit pin for reproducibility)
+numpy==1.26.4                 # Pandas dependency & NaN handling
+pydantic==2.2.2               # Data models (explicit pin for reproducibility)
 
 #########################################
 # Advanced Mode (SIMPLE_MODE unset / 0)
@@ -28,4 +28,5 @@ huggingface_hub==0.19.4       # Model downloads & caching
 
 # NOTE:
 # - Keep versions aligned unless server.py logic updated for breaking changes.
+
 # - Remove advanced block if you want a minimal deterministic deployment.
