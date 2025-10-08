@@ -5,6 +5,7 @@
   <title>Diseases | Siddha Medicine</title>
   <link rel="stylesheet" href="style.css">
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/5.15.4/css/all.min.css">
+  
 </head>
 <body>
   <header class="navbar">
@@ -139,6 +140,7 @@
         
       } catch (error) {
         console.error('Error fetching all diseases:', error);
+  // Silent failure - fall back to sample data without showing a UI notice
         // Fall back to sample data if API fails
         loadSampleDiseaseData();
       }
@@ -159,6 +161,8 @@
         type: apiDisease.type?.toLowerCase() || 'unknown'
       };
     }
+
+    
     
     // Function to load sample disease data if API fails
     function loadSampleDiseaseData() {
@@ -302,11 +306,7 @@
         if (diseases.length === 0) {
           diseaseList.innerHTML = '<p>No diseases found for this dosha type.</p>';
         } else {
-          // Create a counter to display
-          const countHeader = document.createElement('div');
-          countHeader.className = 'diseases-count';
-          countHeader.textContent = `Found ${diseases.length} diseases classified as ${doshaType.charAt(0).toUpperCase() + doshaType.slice(1)}`;
-          diseaseList.appendChild(countHeader);
+          // (category count intentionally omitted)
           
           // Create disease items
           diseases.forEach(disease => {
@@ -328,11 +328,11 @@
               }
               
               diseaseContent = `
-                <div class="disease-name">${disease.name}</div>
+                <div class="disease-name">${titleCase(disease.name)}</div>
                 <div class="disease-symptoms">${symptomsPreview}</div>
               `;
             } else {
-              diseaseContent = `<div class="disease-name">${disease.name}</div>`;
+              diseaseContent = `<div class="disease-name">${titleCase(disease.name)}</div>`;
             }
             
             diseaseItem.innerHTML = diseaseContent;
@@ -347,16 +347,9 @@
         }
       } catch (error) {
         console.error(`Error fetching ${doshaType} diseases:`, error);
-        
-        // Show error message
-        diseaseList.innerHTML = `
-          <div class="error-message">
-            <p>Failed to load diseases from the server.</p>
-            <p>Error: ${error.message}</p>
-            <p>Using cached data if available...</p>
-          </div>
-        `;
-        
+  // Silent failure in UI; fall back to cached data if available
+  diseaseList.innerHTML = '';
+
         // Try to use cached data if available
         const cachedDiseases = doshaMap[doshaType];
         if (cachedDiseases && cachedDiseases.length > 0) {
@@ -370,11 +363,7 @@
     
     // Helper function to display diseases in a list
     function displayDiseaseList(diseases, doshaType, containerElement) {
-      // Create a counter to display
-      const countHeader = document.createElement('div');
-      countHeader.className = 'diseases-count';
-      countHeader.textContent = `Found ${diseases.length} diseases classified as ${doshaType.charAt(0).toUpperCase() + doshaType.slice(1)}`;
-      containerElement.appendChild(countHeader);
+      // (category count intentionally omitted)
       
       // Create disease items
       diseases.forEach(disease => {
@@ -396,14 +385,14 @@
           }
           
           diseaseContent = `
-            <div class="disease-name">${disease.name}</div>
+            <div class="disease-name">${titleCase(disease.name)}</div>
             <div class="disease-symptoms">${symptomsPreview}</div>
           `;
         } else {
-          diseaseContent = `<div class="disease-name">${disease.name}</div>`;
+          diseaseContent = `<div class="disease-name">${titleCase(disease.name)}</div>`;
         }
         
-        diseaseItem.innerHTML = diseaseContent;
+  diseaseItem.innerHTML = diseaseContent;
         
         // Add click event to show disease details
         diseaseItem.addEventListener('click', function() {
@@ -416,7 +405,7 @@
 
     // Function to show disease details in modal
     function showDiseaseDetails(disease) {
-      document.getElementById('modal-disease-title').textContent = disease.name;
+  document.getElementById('modal-disease-title').textContent = titleCase(disease.name);
       document.getElementById('modal-symptoms').textContent = disease.symptoms || 'Not specified';
       
       // Format the remedy text to make it more readable
@@ -477,6 +466,15 @@
       return formattedText;
     }
 
+    // Helper to convert names like 'TONSILLITIS' to 'Tonsillitis'
+    function titleCase(str) {
+      if (!str) return '';
+      // Normalize spacing and lowercase first
+      return str.toLowerCase().split(/\s+/).map(word => {
+        return word.charAt(0).toUpperCase() + word.slice(1);
+      }).join(' ');
+    }
+
     // Function to search diseases using the API
     async function searchDiseases() {
       const query = document.getElementById('searchInput').value.trim();
@@ -533,18 +531,13 @@
         
       } catch (error) {
         console.error('Error searching via API:', error);
-        resultsList.innerHTML = `
-          <div class="error-message">
-            <p>Failed to search using the API.</p>
-            <p>Error: ${error.message}</p>
-            <p>Falling back to client-side search...</p>
-          </div>
-        `;
-        
+  // Silent failure for search UI; fall back to client-side search
+  resultsList.innerHTML = '';
+
         // Fall back to client-side search if API fails
         setTimeout(() => {
           searchLocalDiseases(query, resultsList);
-        }, 1000);
+        }, 900);
       }
       
       // Scroll to the section
@@ -578,7 +571,15 @@
       // Create a counter to display
       const countHeader = document.createElement('div');
       countHeader.className = 'diseases-count';
-      countHeader.textContent = `Found ${results.length} results for "${query}"${isLocal ? " (local search)" : ""}`;
+      const label = results.length === 1 ? 'result' : 'results';
+      const subtitle = `${query}${isLocal ? ' (local search)' : ''}`;
+      countHeader.innerHTML = `
+        <div class="count-number">${results.length}</div>
+        <div class="count-text">
+          <div class="count-label">Found ${label}</div>
+          <div class="count-sub">Query: "${subtitle}"</div>
+        </div>
+      `;
       resultsList.appendChild(countHeader);
       
       // Create result items
@@ -591,13 +592,15 @@
         typeSpan.className = `dosha-badge ${disease.type}`;
         typeSpan.textContent = disease.type ? disease.type.charAt(0).toUpperCase() + disease.type.slice(1) : 'Unknown';
         
-        // Create disease name element
-        const nameSpan = document.createElement('span');
-        nameSpan.textContent = disease.name;
-        
-        // Add elements to disease item
-        diseaseItem.appendChild(typeSpan);
-        diseaseItem.appendChild(nameSpan);
+        // Build inner content for search result (badge + name + small symptom preview)
+        let inner = '';
+        inner += `<div style="display:flex; align-items:center; gap:8px; margin-bottom:6px;"><span class="dosha-badge ${disease.type}">${disease.type ? disease.type.charAt(0).toUpperCase() + disease.type.slice(1) : 'Unknown'}</span><div style="font-weight:700">${titleCase(disease.name)}</div></div>`;
+        if (disease.symptoms && disease.symptoms.length > 0) {
+          let preview = disease.symptoms;
+          if (preview.length > 80) preview = preview.substring(0, 80) + '...';
+          inner += `<div class="disease-symptoms">${preview}</div>`;
+        }
+        diseaseItem.innerHTML = inner;
         
         // Add click event to show disease details
         diseaseItem.addEventListener('click', function() {

@@ -457,48 +457,98 @@ footer {
 .disease-list {
   display: grid;
   grid-template-columns: repeat(auto-fill, minmax(250px, 1fr));
-  gap: 15px;
+  gap: 20px; /* slightly larger gap for breathing room */
 }
 
 .disease-item {
   background: white;
-  padding: 15px;
-  border-radius: 8px;
-  box-shadow: 0 2px 5px rgba(0,0,0,0.1);
+  padding: 20px; /* increased padding */
+  border-radius: 10px;
+  box-shadow: 0 4px 10px rgba(0,0,0,0.08);
   cursor: pointer;
-  transition: all 0.2s ease;
+  transition: transform 0.18s ease, box-shadow 0.18s ease;
   position: relative;
   overflow: hidden;
   border-left: 4px solid var(--primary-color);
+  min-height: 84px; /* ensure consistent card height for better rhythm */
 }
 
 .disease-item:hover {
-  transform: translateY(-3px);
-  box-shadow: 0 4px 8px rgba(0,0,0,0.15);
+  transform: translateY(-4px);
+  box-shadow: 0 6px 14px rgba(0,0,0,0.12);
   background-color: #f0f8f0;
 }
 
 .disease-name {
-  font-weight: bold;
-  margin-bottom: 8px;
+  font-weight: 700;
+  margin-bottom: 10px;
   color: var(--primary-color);
 }
 
 .disease-symptoms {
-  font-size: 0.9rem;
+  font-size: 0.95rem;
   color: #666;
   font-style: italic;
+  margin-top: 8px;
+}
+
+/* Ensure disease items in category lists stack vertically for readable content */
+.disease-item { display: block; }
+
+.disease-name { 
+  font-size: 1.02rem;
+  text-transform: capitalize; /* make titles look nicer */
+}
+
+.disease-symptoms {
+  margin-top: 6px;
+  line-height: 1.4;
+  /* Clamp long previews to 3 lines to keep cards tidy */
+  display: -webkit-box;
+  -webkit-line-clamp: 3;
+  line-clamp: 3;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
 .diseases-count {
   width: 100%;
-  text-align: center;
-  padding: 10px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+  padding: 10px 14px;
   margin-bottom: 15px;
   background: #f0f8f0;
-  border-radius: 5px;
+  border-radius: 8px;
   color: var(--primary-color);
-  font-weight: bold;
+}
+
+.diseases-count .count-number {
+  background: var(--accent-color);
+  color: var(--primary-color);
+  padding: 6px 10px;
+  border-radius: 6px;
+  font-weight: 800;
+  font-size: 1.15rem;
+  min-width: 42px;
+  text-align: center;
+}
+
+.diseases-count .count-text {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+}
+
+.diseases-count .count-label {
+  font-weight: 700;
+}
+
+.diseases-count .count-sub {
+  font-size: 0.9rem;
+  color: #556060;
 }
 
 /* Modal Styles */
@@ -692,10 +742,9 @@ footer {
   color: #566573;
 }
 
-/* Improve disease item styling for search results */
-.disease-item {
-  display: flex;
-  align-items: center;
+/* Ensure search results items layout nicely without overriding category cards */
+#search-results-list .disease-item {
+  display: block;
 }
 
 @media (max-width: 768px) {
