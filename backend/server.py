@@ -29,7 +29,7 @@ if not SIMPLE_MODE:
     from langchain.text_splitter import RecursiveCharacterTextSplitter  # type: ignore
     from langchain.prompts import PromptTemplate  # type: ignore
     from langchain.chains.combine_documents import create_stuff_documents_chain  # type: ignore
-    from langchain.chains import create_retrieval_chain  # type: ignore
+    from langchain.chains.retrieval import create_retrieval_chain # type: ignore
 
 # --- 1. SETUP ---
 load_dotenv()
@@ -1191,5 +1191,3 @@ def search_herbs(query: str):
         return {"count": len(results), "herbs": results}
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Failed to search herbs: {str(e)}")
-
-

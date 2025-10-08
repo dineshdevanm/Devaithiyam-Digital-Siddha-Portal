@@ -55,9 +55,20 @@
           <h4 class="group-title">Remedies Using Ingredients</h4>
           <ul id="ingredient-remedies" class="result-list"></ul>
         </div>
+        <div class="result-group" id="col-remedies-intersection" style="display:none;">
+          <h4 class="group-title">Remedies Matching Disease + Ingredients</h4>
+          <ul id="remedies-intersection" class="result-list"></ul>
+        </div>
       </div>
     </section>
   </main>
+  <!-- Remedy modal (shared) -->
+  <div id="remedy-modal" class="modal" aria-hidden="true">
+    <div class="modal-content" role="dialog" aria-modal="true" aria-labelledby="remedy-modal-title">
+      <span class="close-button" id="remedy-modal-close" aria-label="Close">&times;</span>
+      <div id="remedy-modal-body"></div>
+    </div>
+  </div>
 
   <script src="search.js"></script>
 </body>
