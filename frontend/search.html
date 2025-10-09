@@ -1,18 +1,17 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-  <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Siddha Search</title>
-  <link rel="stylesheet" href="style.css" />
-  <link rel="preconnect" href="https://fonts.googleapis.com">
-  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;600&display=swap" rel="stylesheet">
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Siddha Portal | Remedy Finder</title>
+  <link rel="stylesheet" href="style.css">
+  <script defer src="search.js"></script>
 </head>
 <body>
+  <!-- Unified Navbar -->
   <header>
     <div class="navbar">
-      <h1><a href="index.html" class="header-link">Siddheva - Search</a></h1>
+      <h1>Devaithiyam - Digital Siddha Portal</h1>
       <nav>
         <a href="index.html">Home</a>
         <a href="chatbot.html">Chatbot</a>
@@ -24,52 +23,51 @@
     </div>
   </header>
 
-  <main class="container">
-    <section class="card search-filter-card">
-      <h2 class="section-title">Advanced Siddha Search</h2>
-      <p class="muted">Search by disease name, ingredients, or combine both. Results are intelligently ranked.</p>
-      <div class="search-filter-container">
-        <input type="text" id="disease-input" class="search-bar" placeholder="Disease name (e.g. fever)" />
-        <input type="text" id="ingredients-input" class="search-bar" placeholder="Ingredients: milagu, inji, chukku" />
+  <!-- Search Layout -->
+  <main class="search-layout">
+    <!-- Left: Filter Sidebar -->
+    <aside class="filter-sidebar">
+      <h2>🩺 Disease</h2>
+      <select id="disease-select" class="disease-dropdown">
+        <option value="">-- Choose Disease --</option>
+      </select>
+
+      <h2>🌿 Ingredients</h2>
+      <div id="ingredient-filters" class="checkbox-group">
+        <!-- Dynamically loaded checkboxes -->
+      </div>
+
+      <div class="filter-buttons">
         <button id="run-search" class="primary-btn">Search</button>
         <button id="clear-search" class="secondary-btn">Clear</button>
       </div>
-      <div class="helper-text">
-  <small>Tip: You can search with just a disease, just ingredients, or both. (Mode dropdown removed; ingredients require ALL tokens.)</small>
-      </div>
-    </section>
+    </aside>
 
-    <section class="card results-card">
-      <h3 class="section-title">Results</h3>
-      <div id="empty-state" class="muted" style="padding:8px 4px;">Start by entering a disease or some ingredients.</div>
+    <!-- Right: Results -->
+    <section class="results-section">
+      <h2>🔍 Search Results</h2>
+      <div id="search-empty" class="muted">Select a disease or ingredients to begin.</div>
+
       <div class="search-results-grid" id="results-wrapper">
         <div class="result-group" id="col-disease" style="display:none;">
-          <h4 class="group-title" id="disease-heading">Disease Match</h4>
+          <h4 class="group-title">🩺 Disease Matches</h4>
           <ul id="disease-results" class="result-list"></ul>
         </div>
-        <div class="result-group" id="col-diseases-for-ingredients" style="display:none;">
-          <h4 class="group-title">Diseases Related to Ingredients</h4>
-          <ul id="diseases-for-ingredients" class="result-list"></ul>
-        </div>
+
         <div class="result-group" id="col-ingredient-remedies" style="display:none;">
-          <h4 class="group-title">Remedies Using Ingredients</h4>
+          <h4 class="group-title">💊 Remedies</h4>
           <ul id="ingredient-remedies" class="result-list"></ul>
-        </div>
-        <div class="result-group" id="col-remedies-intersection" style="display:none;">
-          <h4 class="group-title">Remedies Matching Disease + Ingredients</h4>
-          <ul id="remedies-intersection" class="result-list"></ul>
         </div>
       </div>
     </section>
   </main>
-  <!-- Remedy modal (shared) -->
+
+  <!-- Modal for remedy details -->
   <div id="remedy-modal" class="modal" aria-hidden="true">
-    <div class="modal-content" role="dialog" aria-modal="true" aria-labelledby="remedy-modal-title">
-      <span class="close-button" id="remedy-modal-close" aria-label="Close">&times;</span>
+    <div class="modal-content">
+      <span id="remedy-modal-close" class="close">&times;</span>
       <div id="remedy-modal-body"></div>
     </div>
   </div>
-
-  <script src="search.js"></script>
 </body>
 </html>

@@ -791,173 +791,54 @@ def _prep_matches_variants(prep: str, token_variants: Dict[str, List[str]], mode
         ok = len(matched) == len(token_variants)
     return {"ok": ok, "matched": matched, "missing": missing, "match_count": len(matched)}
 
-@app.get("/search/filters", summary="Filter by disease and ingredients (ecommerce-like)")
-def filtered_search(disease: Optional[str] = None, ingredients: Optional[str] = None, mode: str = "all", limit: int = 20, offset: int = 0):
+from fastapi import HTTPException
+
+@app.get("/search/filters", summary="Search remedies by disease and ingredients (single CSV version)")
+def search_filters(disease: str = "", ingredients: str = ""):
     """
-        Refined search behavior:
-        - If only disease provided: return matched diseases and the remedies referenced by those diseases.
-        - If only ingredients provided: return diseases whose remedy text mentions those ingredients (match mode rules) AND remedies whose preparation uses them.
-        - If both provided: return disease matches; remedies linked to those diseases; remedies using ingredients (independent lists, no intersection section).
-        Parameters:
-            disease: substring match on disease/name field (case-insensitive)
-            ingredients: comma/space separated tokens; Tamil synonyms expanded (milagu→pepper, etc.)
-            mode: 'all' (default) all tokens must appear; 'any' at least one
-        Response fields:
-            - disease_matches
-            - diseases_for_ingredients (only populated when disease not given & ingredients provided)
-            - remedies_for_disease
-            - remedies_using_ingredients (+ ingredient_match_info)
+    Simple Siddha remedy search using only ingredients.csv
+    Columns expected: Disease, Remedy Name, Ingredients, Preparation
     """
     try:
-        limit = max(1, min(int(limit), 100))
-        offset = max(0, int(offset))
-        mode = (mode or 'all').lower()
-        if mode not in {"all", "any"}:
-            mode = "all"
+        df = getattr(app.state, 'ingredients_df', None)
+        if df is None or df.empty:
+            raise HTTPException(status_code=500, detail="Ingredients CSV not loaded.")
 
-        all_diseases: List[Dict[str, Any]] = getattr(app.state, 'all_diseases', []) or []
-        remedies_list: List[Dict[str, Any]] = getattr(app.state, 'remedies_list', []) or []
+        disease_q = disease.strip().lower()
+        ingredient_list = [i.strip().lower() for i in ingredients.split(",") if i.strip()]
 
-        # 1) Disease filtering with scoring
-        disease_q = (disease or '').strip().lower()
-        disease_matches: List[Dict[str, Any]] = []
+        # Filter 1️⃣ — Disease
         if disease_q:
-            # Only match against disease/name field, ignore symptoms & remedy text for this mode
-            q_tokens = [t for t in disease_q.replace('-', ' ').split() if t]
-            for row in all_diseases:
-                name = str(row.get('disease') or row.get('name') or '').strip()
-                name_l = name.lower()
-                if not name_l:
-                    continue
-                # presence: require every token to appear in order? For now: all tokens contained (substring)
-                if not all(tok in name_l for tok in q_tokens):
-                    continue
-                # scoring: exact > prefix > token coverage
-                coverage = sum(1 for tok in q_tokens if tok in name_l) / max(1, len(q_tokens))
-                exact = 1.0 if name_l == disease_q else 0.0
-                prefix = 1.0 if name_l.startswith(disease_q) and not exact else 0.0
-                score = exact * 3 + prefix * 1.5 + coverage
-                annotated = dict(row)
-                annotated['score'] = round(score,4)
-                annotated['token_coverage'] = round(coverage,4)
-                disease_matches.append(annotated)
-            disease_matches.sort(key=lambda r: (-r.get('score',0), r.get('disease') or r.get('name') or ''))
-            # Keep only best single match for disease-only query (UI simplicity per requirement)
-            if not ingredients:  # disease-only scenario
-                disease_matches = disease_matches[:1]
-        disease_matches_page = disease_matches[offset:offset+limit]
+            df = df[df["Disease"].astype(str).str.lower().str.contains(disease_q, na=False)]
 
-        # 2) Ingredient filtering
-        ing_tokens = _normalize_ingredient_tokens(ingredients or '')
-        token_variants = _expand_token_variants(ing_tokens) if ing_tokens else {}
-        remedies_using_ingredients: List[Dict[str, Any]] = []
-        ingredient_match_info: List[Dict[str, Any]] = []
-        total_tokens = len(token_variants)
-        if token_variants:
-            for r in remedies_list:
-                info = _prep_matches_variants(r.get('Preparation',''), token_variants, mode)
-                if info["ok"]:
-                    coverage = info['match_count'] / max(1, total_tokens)
-                    score = coverage  # simple for now; could add additional weighting later
-                    annotated_r = dict(r)
-                    annotated_r['score'] = round(score,4)
-                    remedies_using_ingredients.append(annotated_r)
-                    ingredient_match_info.append({
-                        "remedy": _get_remedy_name(r),
-                        "matched": info["matched"],
-                        "missing": info["missing"],
-                        "match_count": info["match_count"],
-                        "coverage": round(coverage,4),
-                        "score": round(score,4)
-                    })
-            # sort by score desc
-            joined = list(zip(remedies_using_ingredients, ingredient_match_info))
-            joined.sort(key=lambda x: (-x[0].get('score',0), x[0].get('Remedy Name') or ''))
-            remedies_using_ingredients = [j[0] for j in joined]
-            ingredient_match_info = [j[1] for j in joined]
-        remedies_using_ingredients_page = remedies_using_ingredients[offset:offset+limit]
-        ingredient_match_info_page = ingredient_match_info[offset:offset+limit]
+        # Filter 2️⃣ — Ingredients
+        if ingredient_list:
+            mask = df["Ingredients"].astype(str).str.lower().apply(
+                lambda x: all(ing in x for ing in ingredient_list)
+            )
+            df = df[mask]
 
-        # 3) Remedies linked to matched diseases (by remedy name mention in 'remedy' field)
-        remedies_for_disease: List[Dict[str, Any]] = []
-        if disease_matches:
-            name_map = {}
-            for r in remedies_list:
-                nm = _get_remedy_name(r).strip()
-                if nm:
-                    name_map.setdefault(nm.lower(), r)
-            seen = set()
-            for d in disease_matches:
-                rem_field = str(d.get('remedy') or d.get('Remedy') or '').lower()
-                if not rem_field:
-                    continue
-                for nm, rrow in name_map.items():
-                    if nm and nm in rem_field and nm not in seen:
-                        seen.add(nm)
-                        # Annotate remedy name explicitly
-                        annotated_r = dict(rrow)
-                        annotated_r['Resolved Name'] = _get_remedy_name(rrow)
-                        remedies_for_disease.append(annotated_r)
-            # If this is a disease-only query (no ingredients) and exactly one disease, embed remedies directly
-            if disease_q and not token_variants and len(disease_matches) == 1:
-                disease_matches[0]['primary'] = True
-                disease_matches[0]['remedies'] = [
-                    {
-                        'name': r.get('Resolved Name') or r.get('Remedy Name') or _get_remedy_name(r),
-                        'preparation': r.get('Preparation'),
-                        'usage': r.get('Usage')
-                    } for r in remedies_for_disease
-                ]
-        remedies_for_disease_page = remedies_for_disease[offset:offset+limit]
+        # Results
+        results = df.to_dict(orient="records")
 
-        # 4) Diseases inferred from ingredients (only when no explicit disease filter supplied)
-        diseases_for_ingredients: List[Dict[str, Any]] = []
-        if not disease_q and token_variants:
-            for row in all_diseases:
-                text = " ".join(str(row.get(k) or '') for k in (
-                    'remedy','Remedy','prepared_medicines','Prepared Medicines', 'external_medicines','External Medicines','others','Others'
-                )).lower()
-                if not text:
-                    continue
-                matched_tokens = [base for base, vars_ in token_variants.items() if any(v in text for v in vars_)]
-                if not matched_tokens:
-                    continue
-                if mode == 'all' and len(matched_tokens) != len(token_variants):
-                    continue
-                coverage = len(matched_tokens) / max(1, len(token_variants))
-                annotated = dict(row)
-                annotated['matched_ingredients'] = matched_tokens
-                annotated['score'] = round(coverage,4)
-                diseases_for_ingredients.append(annotated)
-                if len(diseases_for_ingredients) >= limit + offset:
-                    break
-            diseases_for_ingredients.sort(key=lambda r: (-r.get('score',0), r.get('disease') or r.get('name') or ''))
-        diseases_for_ingredients_page = diseases_for_ingredients[offset:offset+limit]
+        if not results:
+            msg = (
+                "No remedies found for the chosen filters. Better try other remedies for this disease."
+                if disease_q and ingredient_list else
+                "No remedies found for the selected filters."
+            )
+        else:
+            msg = f"Found {len(results)} remedy(ies)."
 
-        response = {
-            "query": {
-                "disease": disease_q,
-                "ingredients": ing_tokens,
-                "mode": mode,
-                "limit": limit,
-                "offset": offset
-            },
-            "counts": {
-                "disease_matches": len(disease_matches),
-                "diseases_for_ingredients": len(diseases_for_ingredients),
-                "remedies_using_ingredients": len(remedies_using_ingredients),
-                "remedies_for_disease": len(remedies_for_disease)
-            },
-            "disease_matches": disease_matches_page,
-            "diseases_for_ingredients": diseases_for_ingredients_page,
-            "remedies_using_ingredients": remedies_using_ingredients_page,
-            "ingredient_match_info": ingredient_match_info_page,
-            "remedies_for_disease": remedies_for_disease_page
+        return {
+            "query": {"disease": disease_q, "ingredients": ingredient_list},
+            "count": len(results),
+            "message": msg,
+            "results": results
         }
-        # Ensure no NaN/Inf values are returned (JSON-safe)
-        return _json_safe(response)
+
     except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Failed to perform filtered search: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"Search failed: {e}")
 
 @app.post("/chat", summary="Endpoint to chat with the bot")
 def chat_with_bot(request: ChatRequest):
@@ -1191,3 +1072,20 @@ def search_herbs(query: str):
         return {"count": len(results), "herbs": results}
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Failed to search herbs: {str(e)}")
+
+from fastapi import Query
+
+@app.get("/filters")
+def get_filters():
+    """Return unique diseases and ingredients for dropdown filters."""
+    df = getattr(app.state, 'ingredients_df', None)
+    if df is None or df.empty:
+        raise HTTPException(status_code=500, detail="Ingredients CSV not loaded")
+
+    diseases = sorted(df["Disease"].dropna().unique().tolist())
+    all_ingredients = []
+    for ing in df["Ingredients"].dropna():
+        all_ingredients.extend([i.strip() for i in str(ing).split(",") if i.strip()])
+    ingredients = sorted(set(all_ingredients))
+
+    return {"diseases": diseases, "ingredients": ingredients}
