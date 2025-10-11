@@ -1,11 +1,13 @@
-document.addEventListener('DOMContentLoaded', () => {
-  const API_BASE = 'http://127.0.0.1:8000';
-  const diseaseSelect = document.getElementById('disease-select');
-  const ingredientContainer = document.getElementById('ingredient-filters');
-  const runBtn = document.getElementById('run-search');
-  const clearBtn = document.getElementById('clear-search');
-  const resultsList = document.getElementById('remedy-results');
-  const emptyState = document.getElementById('search-empty');
+document.addEventListener("DOMContentLoaded", () => {
+  const API_BASE = "http://127.0.0.1:8000";
+  const diseaseSelect = document.getElementById("disease-select");
+  const ingredientFilters = document.getElementById("ingredient-filters");
+  const runSearch = document.getElementById("run-search");
+  const clearSearch = document.getElementById("clear-search");
+  const resultsContainer = document.getElementById("ingredient-remedies");
+  const diseaseResults = document.getElementById("disease-results");
+  const resultGroup = document.getElementById("col-ingredient-remedies");
+  const emptyMsg = document.getElementById("search-empty");
 
   async function loadFilters() {
     try {
@@ -13,87 +15,83 @@ document.addEventListener('DOMContentLoaded', () => {
       const data = await res.json();
 
       // Populate diseases
-      diseaseSelect.innerHTML = '<option value="">-- Choose Disease --</option>';
-      const diseases = [...new Set(data.diseases || [])];
-      diseases.forEach(d => {
-        const opt = document.createElement('option');
-        opt.value = d;
-        opt.textContent = d;
-        diseaseSelect.appendChild(opt);
+      data.diseases.forEach(d => {
+        const option = document.createElement("option");
+        option.value = d;
+        option.textContent = d;
+        diseaseSelect.appendChild(option);
       });
 
-      // Populate ingredients as checkboxes
-      ingredientContainer.innerHTML = '';
-      const ingredients = [...new Set(data.ingredients || [])];
-      ingredients.forEach(i => {
-        const label = document.createElement('label');
-        label.classList.add('filter-option');
-        label.innerHTML = `
-          <input type="checkbox" name="ingredient" value="${i}">
-          <span>${i}</span>`;
-        ingredientContainer.appendChild(label);
+      // Populate ingredients
+      data.ingredients.forEach(i => {
+        const label = document.createElement("label");
+        label.classList.add("checkbox-item");
+        label.innerHTML = `<input type="checkbox" value="${i}"> ${i}`;
+        ingredientFilters.appendChild(label);
       });
-    } catch (e) {
-      console.error("Filter load failed:", e);
+    } catch (err) {
+      console.error("Error loading filters:", err);
+      emptyMsg.textContent = "Failed to load filters.";
     }
   }
 
-  async function searchRemedies() {
+  async function performSearch() {
     const disease = diseaseSelect.value.trim();
-    const ingredients = Array.from(document.querySelectorAll('input[name="ingredient"]:checked'))
-      .map(cb => cb.value.trim());
+    const ingredients = Array.from(
+      ingredientFilters.querySelectorAll("input:checked")
+    ).map(cb => cb.value);
 
     if (!disease && ingredients.length === 0) {
-      emptyState.textContent = "Please select a disease or ingredients to begin.";
-      emptyState.style.display = "block";
+      emptyMsg.textContent = "Please select a disease or ingredients to begin.";
       return;
     }
 
-    runBtn.textContent = "Searching...";
-    runBtn.disabled = true;
-    resultsList.innerHTML = '';
-    emptyState.style.display = 'none';
+    emptyMsg.textContent = "Searching...";
+    resultsContainer.innerHTML = "";
+    resultGroup.style.display = "none";
 
     try {
       const url = new URL(`${API_BASE}/search/filters`);
-      if (disease) url.searchParams.set('disease', disease);
-      if (ingredients.length) url.searchParams.set('ingredients', ingredients.join(','));
+      if (disease) url.searchParams.set("disease", disease);
+      if (ingredients.length) url.searchParams.set("ingredients", ingredients.join(","));
+
       const res = await fetch(url);
       const data = await res.json();
 
-      if (data.results && data.results.length) {
-        data.results.forEach(r => {
-          const li = document.createElement('li');
-          li.innerHTML = `
-            <strong>${r["Remedy Name"]}</strong><br>
-            <small><b>Ingredients:</b> ${r["Ingredients"]}</small><br>
-            <small><b>Preparation:</b> ${r["Preparation"]}</small>`;
-          resultsList.appendChild(li);
-        });
-      } else {
-        emptyState.style.display = 'block';
-        emptyState.textContent = data.message || "No remedies found.";
+      if (!data.results || data.results.length === 0) {
+        emptyMsg.textContent = data.message || "No results found.";
+        return;
       }
+
+      emptyMsg.textContent = data.message;
+      resultGroup.style.display = "block";
+
+      data.results.forEach(r => {
+        const li = document.createElement("li");
+        li.classList.add("result-card");
+        li.innerHTML = `
+          <h3>${r["Remedy Name"]}</h3>
+          <p><strong>Disease:</strong> ${r["Disease"]}</p>
+          <p><strong>Ingredients:</strong> ${r["Ingredients"]}</p>
+          <p><strong>Preparation:</strong> ${r["Preparation"]}</p>
+        `;
+        resultsContainer.appendChild(li);
+      });
     } catch (err) {
-      console.error("Search failed:", err);
-      emptyState.textContent = "Error performing search.";
-      emptyState.style.display = "block";
-    } finally {
-      runBtn.textContent = "Search";
-      runBtn.disabled = false;
+      console.error("Search error:", err);
+      emptyMsg.textContent = "Search failed. Try again.";
     }
   }
 
   function clearFilters() {
-    diseaseSelect.selectedIndex = 0;
-    document.querySelectorAll('input[name="ingredient"]').forEach(cb => (cb.checked = false));
-    resultsList.innerHTML = '';
-    emptyState.textContent = "Select a disease or ingredients to begin.";
-    emptyState.style.display = 'block';
+    diseaseSelect.value = "";
+    ingredientFilters.querySelectorAll("input").forEach(cb => cb.checked = false);
+    resultsContainer.innerHTML = "";
+    emptyMsg.textContent = "Select a disease or ingredients to begin.";
+    resultGroup.style.display = "none";
   }
 
-  runBtn.addEventListener('click', searchRemedies);
-  clearBtn.addEventListener('click', clearFilters);
-
   loadFilters();
+  runSearch.addEventListener("click", performSearch);
+  clearSearch.addEventListener("click", clearFilters);
 });

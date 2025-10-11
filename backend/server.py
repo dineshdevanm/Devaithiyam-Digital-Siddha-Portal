@@ -1075,17 +1075,80 @@ def search_herbs(query: str):
 
 from fastapi import Query
 
-@app.get("/filters")
-def get_filters():
-    """Return unique diseases and ingredients for dropdown filters."""
-    df = getattr(app.state, 'ingredients_df', None)
-    if df is None or df.empty:
-        raise HTTPException(status_code=500, detail="Ingredients CSV not loaded")
 
-    diseases = sorted(df["Disease"].dropna().unique().tolist())
+@app.get("/filters", summary="Get filter lists for frontend dropdowns")
+def load_ingredients_data():
+    """Load ingredients.csv once during startup."""
+    try:
+        df = pd.read_csv("disease/backend/ingredients.csv")
+        df.columns = [c.strip().lower() for c in df.columns]
+        app.state.ingredients_df = df
+        print(f"✅ Loaded {len(df)} rows from ingredients.csv")
+    except Exception as e:
+        print(f"❌ Failed to load ingredients.csv: {e}")
+        app.state.ingredients_df = pd.DataFrame()
+def get_filters():
+    """Return unique diseases and ingredients for the frontend filters."""
+    df = getattr(app.state, "ingredients_df", pd.DataFrame())
+    if df.empty:
+        raise HTTPException(status_code=500, detail="Ingredients CSV not loaded or empty.")
+
+    disease_col = next((c for c in df.columns if "disease" in c), None)
+    ingredients_col = next((c for c in df.columns if "ingredient" in c), None)
+
+    diseases = sorted(df[disease_col].dropna().unique().tolist())
+
     all_ingredients = []
-    for ing in df["Ingredients"].dropna():
-        all_ingredients.extend([i.strip() for i in str(ing).split(",") if i.strip()])
+    for i in df[ingredients_col].dropna():
+        all_ingredients.extend([x.strip().title() for x in str(i).split(",") if x.strip()])
     ingredients = sorted(set(all_ingredients))
 
     return {"diseases": diseases, "ingredients": ingredients}
+
+
+@app.get("/search/filters", summary="Search remedies based on selected disease and ingredients")
+def search_filters(disease: str = "", ingredients: str = ""):
+    """Filter remedies from ingredients.csv based on disease and selected ingredients."""
+    df = getattr(app.state, "ingredients_df", pd.DataFrame())
+    if df.empty:
+        raise HTTPException(status_code=500, detail="Ingredients CSV not loaded or empty.")
+
+    df.columns = [c.strip().lower() for c in df.columns]
+    disease_col = next((c for c in df.columns if "disease" in c), None)
+    remedy_col = next((c for c in df.columns if "remedy" in c and "name" in c), None)
+    ingredient_col = next((c for c in df.columns if "ingredient" in c), None)
+    prep_col = next((c for c in df.columns if "preparation" in c), None)
+
+    disease = disease.strip().lower()
+    ingredients_list = [i.strip().lower() for i in ingredients.split(",") if i.strip()]
+
+    # 1️⃣ Filter by disease
+    if disease:
+        df = df[df[disease_col].astype(str).str.lower().str.contains(disease, na=False)]
+
+    # 2️⃣ Filter by ingredients (if any selected)
+    if ingredients_list:
+        df = df[df[ingredient_col].astype(str).str.lower().apply(
+            lambda x: all(i in x for i in ingredients_list)
+        )]
+
+    # 3️⃣ Handle empty results
+    if df.empty:
+        return {
+            "count": 0,
+            "message": "No remedies found for the chosen filters. Try other remedies for this disease.",
+            "results": []
+        }
+
+    # 4️⃣ Build results
+    results = [
+        {
+            "Disease": row.get(disease_col, ""),
+            "Remedy Name": row.get(remedy_col, ""),
+            "Ingredients": row.get(ingredient_col, ""),
+            "Preparation": row.get(prep_col, "")
+        }
+        for _, row in df.iterrows()
+    ]
+
+    return {"count": len(results), "message": f"Found {len(results)} remedy(ies).", "results": results}
